@@ -1,0 +1,91 @@
+{
+  "dataRoles": [
+    {
+      "displayName": "UniqueID",
+      "description": "should be unique value column to the dataset",
+      "kind": "GroupingOrMeasure",
+      "name": "UniqueID"
+    },
+    {
+      "displayName": "Values",
+      "kind": "GroupingOrMeasure",
+      "name": "Values"
+    }
+  ],
+  "dataViewMappings": [
+    {
+      "scriptResult": {
+        "dataInput": {
+          "table": {
+            "rows": {
+              "select": [
+                {
+                  "for": {
+                    "in": "UniqueID"
+                  }
+                },
+                {
+                  "for": {
+                    "in": "Values"
+                  }
+                }
+              ],
+              "dataReductionAlgorithm": {
+                "top": {}
+              }
+            }
+          }
+        },
+        "script": {
+          "scriptProviderDefault": "R",
+          "scriptOutputType": "html",
+          "source": {
+            "objectName": "rcv_script",
+            "propertyName": "source"
+          },
+          "provider": {
+            "objectName": "rcv_script",
+            "propertyName": "provider"
+          }
+        }
+      }
+    }
+  ],
+  "objects": {
+    "rcv_script": {
+      "properties": {
+        "provider": {
+          "type": {
+            "text": true
+          }
+        },
+        "source": {
+          "type": {
+            "scripting": {
+              "source": true
+            }
+          }
+        }
+      }
+    },
+
+  "setting_axis_params":{
+    "properties": {
+      "xaxis1":{
+        "type" :{
+          "text" :true
+        }
+      }
+    }
+  }
+
+  },  
+  "suppressDefaultTitle": true,
+ 
+  "privileges": [
+    {
+      "name": "WebAccess",
+      "parameters": ["https://cdn.plot.ly/"]
+    }
+  ]
+}
