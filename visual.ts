@@ -26,59 +26,21 @@
 "use strict";
 import powerbi from "powerbi-visuals-api";
 import { formattingSettings, FormattingSettingsService } from "powerbi-visuals-utils-formattingmodel";
-
-import * as d3 from "d3"; 
+import "./../style/visual.less";
 
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 import IVisual = powerbi.extensibility.visual.IVisual;
 import DataView = powerbi.DataView;
 import IViewport = powerbi.IViewport;
-
-
-import DataViewCategoryColumn = powerbi.DataViewCategoryColumn;
-import DataViewValueColumns = powerbi.DataViewValueColumns;
-import DataViewValueColumn = powerbi.DataViewValueColumn;
-import DataViewValueColumnGroup = powerbi.DataViewValueColumnGroup;
-import DataViewMatrixNode = powerbi.DataViewMatrixNode;
-import DataViewHierarchyLevel = powerbi.DataViewHierarchyLevel;
-import DataViewTable = powerbi.DataViewTable;
-import DataViewTableRow = powerbi.DataViewTableRow;
+import IVisualHost = powerbi.extensibility.visual.IVisualHost;
+import EnumerateVisualObjectInstancesOptions = powerbi.EnumerateVisualObjectInstancesOptions;
+import VisualObjectInstance = powerbi.VisualObjectInstance;
+import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnumerationObject;
 
 
 import { parseElement, resetInjector, runHTMLWidgetRenderer } from "./htmlInjectionUtility";
 import { VisualFormattingSettingsModel } from "./settings";
-
-
-//###########
-import ISelectionManager = powerbi.extensibility.ISelectionManager;
-import IVisualHost = powerbi.extensibility.visual.IVisualHost;
-
-
-
-
-export interface ISelectionId {
-    equals(other: ISelectionId): boolean;
-    includes(other: ISelectionId, ignoreHighlight?: boolean): boolean;
-    getKey(): string;
-    getSelector(): powerbi.data.Selector;
-    getSelectorsByColumn(): powerbi.data.SelectorsByColumn;
-    hasIdentity(): boolean;
-}
-
-
-export interface ISelectionIdBuilder {
-    withCategory(categoryColumn: DataViewCategoryColumn, index: number): this;
-    withSeries(seriesColumn: DataViewValueColumns, valueColumn: DataViewValueColumn | DataViewValueColumnGroup): this;
-    withMeasure(measureId: string): this;
-    withMatrixNode(matrixNode: DataViewMatrixNode, levels: DataViewHierarchyLevel[]): this;
-    withTable(table: DataViewTable, rowIndex: number): this;
-    createSelectionId(): ISelectionId;
-}
-
-
-
-//##################################
 
 enum VisualUpdateType {
     Data = 2,
@@ -128,25 +90,25 @@ const renderVisualUpdateType: number[] = [
     VisualUpdateType.Resize + VisualUpdateType.ResizeEnd
 ];
 
+import { VisualSettings } from "./settings";  //
 export class Visual implements IVisual {
     private rootElement: HTMLElement;
+    private target: HTMLElement;
     private headNodes: Node[];
     private bodyNodes: Node[];
     private formattingSettings: VisualFormattingSettingsModel;
     private formattingSettingsService: FormattingSettingsService;
-//#################
-    private target: HTMLElement;
     private host: IVisualHost;
-    private selectionManager: ISelectionManager;
+    private table: HTMLParagraphElement;
+    private settings: VisualSettings; //
 
-//####################
     public constructor(options: VisualConstructorOptions) {
-        //######
+        console.log('Visual constructor', options);
+        this.rootElement = options.element;
         this.host = options.host;
-        this.selectionManager = this.host.createSelectionManager();
-        //##########
         this.formattingSettingsService = new FormattingSettingsService();
-
+        
+        
         if (options && options.element) {
             this.rootElement = options.element;
         }
@@ -154,11 +116,15 @@ export class Visual implements IVisual {
         this.bodyNodes = [];
     }
 
-    
-
-
-
     public update(options: VisualUpdateOptions): void {
+
+        console.log('Visual update', options);
+        console.log('*****Work Area*****')
+        console.log(options)
+        console.log('*******************')
+        debugger;
+
+
         if (!options ||
             !options.type ||
             !options.viewport ||
@@ -169,13 +135,19 @@ export class Visual implements IVisual {
         }
 
         const dataView: DataView = options.dataViews[0];
+        this.settings = Visual.parseSettings(options && options.dataViews && options.dataViews[0]);   //
+        console.log('Visual update$$$$$$$$$$$', options);
+
+        
+
+        
         this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(VisualFormattingSettingsModel, options.dataViews[0]);
-        let selectionManager = this.selectionManager;
 
         let payloadBase64: string = null;
         if (dataView.scriptResult && dataView.scriptResult.payloadBase64) {
             payloadBase64 = dataView.scriptResult.payloadBase64;
         }
+        
 
         if (renderVisualUpdateType.indexOf(options.type) === -1) {
             if (payloadBase64) {
@@ -184,35 +156,11 @@ export class Visual implements IVisual {
         } else {
             this.onResizing(options.viewport);
         }
-        //##############
-        //this.updateSelectionIds(dataView);
-        this.rootElement.innerHTML = '';
-        
-        
-        dataView.table.rows.forEach((row: DataViewTableRow, rowIndex: number) => {
-            const rowDiv = document.createElement('div');
-            rowDiv.innerText = JSON.stringify(row);
-            this.rootElement.appendChild(rowDiv);
+    }
 
-            const selection: ISelectionId = this.host.createSelectionIdBuilder()
-                .withTable(dataView.table, rowIndex)
-                .createSelectionId();
-
-            // Add button for each row and handle selection
-            const button = document.createElement("button");
-            button.innerText = `Select Row ${rowIndex}`;
-            rowDiv.appendChild(button);
-
-            button.addEventListener("click", () => {
-                // Handle click event to apply correspond selection
-                this.selectionManager.select(selection);
-                
-            });
-        });
-            
-        }
-       
-    
+    // public getFormattingModel(): powerbi.visuals.FormattingModel {
+    //     return this.formattingSettingsService.buildFormattingModel(this.visualSettings);
+    // }
 
     public onResizing(finalViewport: IViewport): void {
         // tslint:disable-next-line
@@ -267,11 +215,19 @@ export class Visual implements IVisual {
         runHTMLWidgetRenderer();
     }
 
+    private static parseSettings(dataView: DataView): VisualSettings {
+        return VisualSettings.parse(dataView) as VisualSettings;
+    }
+
+    public enumerateObjectInstances(options: EnumerateVisualObjectInstancesOptions):
+            VisualObjectInstance[] | VisualObjectInstanceEnumerationObject {
+            return VisualSettings.enumerateObjectInstances(this.settings || VisualSettings.getDefault(), options);
+            }
     /**
      * Returns properties pane formatting model content hierarchies, properties and latest formatting values, Then populate properties pane.
      * This method is called once every time we open properties pane or when the user edit any format property. 
      */
     public getFormattingModel(): powerbi.visuals.FormattingModel {
-        return this.formattingSettingsService.buildFormattingModel(this.formattingSettings);
+        return this.formattingSettingsService.buildFormattingModel(this.formattingSettings);  
     }
 }
